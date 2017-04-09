@@ -15,15 +15,17 @@ tokenParser = P.makeTokenParser emptyDef
     { P.commentLine = "#"
     , P.identStart = letter
     , P.identLetter = alphaNum
-    , P.opStart = oneOf "+*-:><=/&|~"
-    , P.opLetter = oneOf "+*-:><=/&|~"
+    , P.opStart = oneOf "+*-><=/&|~$@!"
+    , P.opLetter = oneOf "+*-><=/&|~$@!"
     , P.reservedOpNames =
-        [ "+", "-", "*"
-        , ">", "="
-        , "~", "|", "&"
-        , ":=" ]
+        [ "+", "-", "*", "/"
+        , "<", ">", "<=", ">=", "==", "~="
+        , "~", "|", "&", ">>", "<<"
+        , "@", "!"
+        , "=", "$" ]
     , P.reservedNames =
-        [ "when", "jump" ]
+        [ "if", "then", "else"
+        , "while", "do" ]
     , P.caseSensitive = True
     }
 
@@ -39,7 +41,6 @@ P.TokenParser
     , P.brackets = brackets
     , P.commaSep1 = commaSep1
     } = tokenParser
-
 
 binop :: String -> (a -> a -> a) -> Assoc -> Operator String u Identity a
 binop name fn = Infix ((reservedOp name <|> reserved name) *> pure fn)
