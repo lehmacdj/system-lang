@@ -53,44 +53,10 @@ data Expr
     -- | SizeCoerce Expr Size
     deriving (Show)
 
--- instance Show Expr where
---     -- arithmatic
---     show (Add e1 e2) = undefined
---     show (Mult e1 e2) = undefined
---     show (Sub e1 e2) = undefined
---     show (Div e1 e2) = undefined
-
---     -- bitwise
---     show (Shl e1 e2) = undefined
---     show (Shr e1 e2) = undefined
---     show (And e1 e2) = undefined
---     show (Or e1 e2) = undefined
---     show (Not e) = undefined
-
---     -- comparisons
---     show (Gt e1 e2) = undefined
---     show (Geq e1 e2) = undefined
---     show (Lt e1 e2) = undefined
---     show (Leq e1 e2) = undefined
---     show (Eq e1 e2) = undefined
---     show (Neq e1 e2) = undefined
-
---     -- abstractions
---     show (App e1 e2) = undefined
---     show (Cond e1 e2 e3) = undefined
---     show (While e1 e2) = undefined
-
---     -- compound expressions
---     show (Block es) = undefined
---     show (Tuple es) = undefined
---     show (Array es) = undefined
---     show (Index e1 e2) = undefined
-
---     -- references
---     show (Ref e) = undefined
---     show (Deref e) = undefined
-
---     -- assignment
---     show (Assign e1 e2) = undefined
---     show (Var x) = undefined
---     show (Literal l) = undefined
+isValue :: Expr -> Bool
+isValue (Literal _) = True
+isValue (Var _) = True
+isValue (Block _) = True
+isValue (Tuple es) = all isValue es
+isValue (Array es) = all isValue es
+isValue _ = False
