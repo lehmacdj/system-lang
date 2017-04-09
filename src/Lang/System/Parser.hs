@@ -1,7 +1,7 @@
 module Lang.System.Parser where
 
 import Lang.System.AST
-import Text.Parsec hiding (label)
+import Text.Parsec
 import Text.Parsec.Expr
 import qualified Text.Parsec.Token as P
 import Text.Parsec.Language (emptyDef)
@@ -35,14 +35,24 @@ P.TokenParser
     { P.reservedOp = reservedOp
     , P.reserved = reserved
     , P.parens = parens
-    , P.semiSep1 = semiSep1
     , P.identifier = identifier
     , P.whiteSpace = whiteSpace
     , P.integer = integer
     , P.braces = braces
     , P.brackets = brackets
-    , P.commaSep1 = commaSep1
+    , P.lexeme = lexeme
+    , P.comma = comma
+    , P.semi = semi
     } = tokenParser
+
+semiSepEndBy1 :: Parser a -> Parser [a]
+semiSepEndBy1 p = lexeme p `sepEndBy` semi
+
+commaSepEndBy :: Parser a -> Parser [a]
+commaSepEndBy p = lexeme p `sepEndBy` comma
+
+commaSepEndBy1 :: Parser a -> Parser [a]
+commaSepEndBy1 p = lexeme p `sepEndBy1` comma
 
 binop :: String -> (a -> a -> a) -> Assoc -> Operator String u Identity a
 binop name fn = Infix ((reservedOp name <|> reserved name) *> pure fn)
@@ -71,37 +81,30 @@ expression = buildExpressionParser
 
 compoundExpression :: Parser Expr
 compoundExpression =
-    try (parens compoundExpression)
+    try tuple
+    <|> parens compoundExpression
     <|> fmap Literal literal
     <|> fmap Var identifier
     <|> conditional
-    <|> assignment
-    <|> applications -- this is pretty sketchy
-    <|> try block
-    <|> try array
-    <|> try tuple
+    <|> while
+    -- <|> applications -- this is pretty sketchy
+    <|> block
+    <|> array
 
 literal :: Parser Literal
 literal = fromInteger <$> integer
 
-applications :: Parser Expr
-applications = foldl App <$> expression <*> some (parens expression)
+-- applications :: Parser Expr
+-- applications = foldl App <$> expression <*> some (parens expression)
 
 block :: Parser Expr
-block = Block <$> braces (semiSep1 expression)
+block = Block <$> braces (semiSepEndBy1 expression)
 
 tuple :: Parser Expr
-tuple = Tuple <$> parens (commaSep1 expression)
+tuple = Tuple <$> parens ((:) <$> expression <* comma <*> commaSepEndBy expression)
 
 array :: Parser Expr
-array = Array <$> brackets (commaSep1 expression)
-
-assignment :: Parser Expr
-assignment = do
-    x <- expression
-    reservedOp "="
-    e <- expression
-    pure $ Assign x e
+array = Array <$> brackets (commaSepEndBy1 expression)
 
 conditional :: Parser Expr
 conditional = do
@@ -112,6 +115,14 @@ conditional = do
     reserved "else"
     e3 <- expression
     pure $ Cond e1 e2 e3
+
+while :: Parser Expr
+while = do
+    reserved "while"
+    e1 <- expression
+    reserved "do"
+    e2 <- expression
+    pure $ While e1 e2
 
 readExpr :: String -> Either ParseError Expr
 readExpr = parse (whiteSpace *> expression <* eof) "system-expr"
