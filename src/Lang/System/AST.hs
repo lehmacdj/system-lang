@@ -7,7 +7,7 @@ import Data.List
 type Literal = Integer
 
 data Expr
-    -- arithmatic
+    -- arithmetic
     = Add Expr Expr
     | Mult Expr Expr
     | Sub Expr Expr
