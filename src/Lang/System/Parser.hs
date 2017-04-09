@@ -20,12 +20,14 @@ tokenParser = P.makeTokenParser emptyDef
     , P.reservedOpNames =
         [ "+", "-", "*", "/"
         , "<", ">", "<=", ">=", "==", "~="
-        , "~", "|", "&", ">>", "<<"
+        , "~", "|", "&", "^", ">>", "<<"
         , "@", "!"
+        , "->"
         , "=", "$" ]
     , P.reservedNames =
         [ "if", "then", "else"
-        , "while", "do" ]
+        , "while", "do"
+        , "unit", "bit", "byte" ]
     , P.caseSensitive = True
     }
 
@@ -53,50 +55,63 @@ prefix name fn = Prefix ((reservedOp name <|> reserved name) *> pure fn)
 
 expression :: Parser Expr
 expression = buildExpressionParser
-    [ [ binopl "*" Mult ]
+    [ [ prefix "~" Not, prefix "@" Ref, prefix "!" Deref ]
+    , [ binopl "*" Mult, binopl "/" Div ]
     , [ binopl "+" Add, binopl "-" Sub ]
-    , [ binopl ">" Gt, binopl "=" Eq ]
-    , [ prefix "~" Not ]
+    , [ binopl ">>" Shr, binopl "<<" Shl ]
+    , [ binopl "&" And ]
+    , [ binopl "^" Xor ]
+    , [ binopl "|" Or ]
+    , [ binopl ">=" Geq, binopl "<=" Leq, binopl ">" Gt, binopl "<" Lt
+      , binopl "==" Eq, binopl "~=" Neq
+      ]
+    , [ binopl "=" Assign ]
     ]
     compoundExpression
 
 compoundExpression :: Parser Expr
 compoundExpression =
-    fmap Constant constant
+    try (parens compoundExpression)
+    <|> fmap Literal literal
     <|> fmap Var identifier
-    <|> parens compoundExpression
+    <|> conditional
+    <|> assignment
+    <|> applications -- this is pretty sketchy
+    <|> try block
+    <|> try array
+    <|> try tuple
 
-constant :: Parser Value
-constant = fromInteger <$> integer
+literal :: Parser Literal
+literal = fromInteger <$> integer
 
-block :: Parser Statement
-block = Block <$> braces (semiSep1 statement)
+applications :: Parser Expr
+applications = foldl App <$> expression <*> some (parens expression)
 
-assignment :: Parser Statement
+block :: Parser Expr
+block = Block <$> braces (semiSep1 expression)
+
+tuple :: Parser Expr
+tuple = Tuple <$> parens (commaSep1 expression)
+
+array :: Parser Expr
+array = Array <$> brackets (commaSep1 expression)
+
+assignment :: Parser Expr
 assignment = do
-    x <- identifier
-    reservedOp ":="
+    x <- expression
+    reservedOp "="
     e <- expression
     pure $ Assign x e
 
-label :: Parser Statement
-label = Label <$> (string ":" *> identifier <* string ":")
-
-conditional :: Parser Statement
+conditional :: Parser Expr
 conditional = do
-    reserved "when"
-    e <- expression
-    s <- statement
-    pure $ Cond s e
-
-jump :: Parser Statement
-jump = Jump <$> (reserved "jump" *> identifier)
-
-statement :: Parser Statement
-statement = block <|> assignment <|> label <|> conditional <|> jump
+    reserved "if"
+    e1 <- expression
+    reserved "then"
+    e2 <- expression
+    reserved "else"
+    e3 <- expression
+    pure $ Cond e1 e2 e3
 
 readExpr :: String -> Either ParseError Expr
 readExpr = parse (whiteSpace *> expression <* eof) "system-expr"
-
-readStatement :: String -> Either ParseError Statement
-readStatement = parse (whiteSpace *> statement <* eof) "system-statement"

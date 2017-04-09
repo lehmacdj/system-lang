@@ -18,6 +18,7 @@ data Expr
     | Shr Expr Expr
     | And Expr Expr
     | Or Expr Expr
+    | Xor Expr Expr
     | Not Expr
 
     -- comparisons
@@ -49,6 +50,7 @@ data Expr
     -- required but not involved in parsing
     | Var String
     | Literal Literal
+    -- | SizeCoerce Expr Size
 
 instance Show Expr where
     -- arithmatic
