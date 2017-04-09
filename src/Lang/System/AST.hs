@@ -47,7 +47,7 @@ data Expr
     -- assignment
     | Assign Expr Expr
 
-    -- required but not involved in parsing
+    -- required but not involved in evaluation
     | Var String
     | Literal Literal
     -- | SizeCoerce Expr Size
