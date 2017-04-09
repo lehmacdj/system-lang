@@ -20,10 +20,10 @@ data Expr = Add Expr Expr
           | Constant Value
 
 data Statement = Jump Label
-                 | Assign String Expr
-                 | Cond Statement Expr
-                 | Block [Statement]
-                 | Label String
+               | Assign String Expr
+               | Cond Statement Expr
+               | Block [Statement]
+               | Label String
 
 instance Show Expr where
     show (Add e1 e2) = show e1 ++ " + " ++ show e2
