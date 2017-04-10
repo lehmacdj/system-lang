@@ -51,6 +51,7 @@ data Size = Empty
           | Bit
           | Byte
           | Any
+          | Unsized
           | UserSize String
           | Ptr Size
           | FunctionSize Size Size
@@ -63,6 +64,7 @@ sizeof Empty = 0
 sizeof Bit = 1
 sizeof Byte = 8
 sizeof Any = undefined
+sizeof Unsized = undefined
 sizeof (Ptr _) = 64
 sizeof (FunctionSize _ _) = 64
 sizeof (ArraySize s n) = sizeof s * n
