@@ -6,30 +6,15 @@ import Data.List
 
 type Literal = Integer
 
+data Builtin = Add | Sub | Mult | Div
+             | And | Or | Xor | Not | Shl | Shr
+             | Gt | Geq | Lt | Leq | Eq | Neq
+             deriving (Show)
+
 data Expr
-    -- arithmetic
-    = Add Expr Expr
-    | Mult Expr Expr
-    | Sub Expr Expr
-    | Div Expr Expr
+    = Builtin Builtin Expr
 
-    -- bitwise
-    | Shl Expr Expr
-    | Shr Expr Expr
-    | And Expr Expr
-    | Or Expr Expr
-    | Xor Expr Expr
-    | Not Expr
-
-    -- comparisons
-    | Gt Expr Expr
-    | Geq Expr Expr
-    | Lt Expr Expr
-    | Leq Expr Expr
-    | Eq Expr Expr
-    | Neq Expr Expr
-
-    -- abstractions
+    -- control flow
     | App Expr Expr
     | Cond Expr Expr Expr
     | While Expr Expr

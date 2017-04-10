@@ -54,6 +54,13 @@ commaSepEndBy p = lexeme p `sepEndBy` comma
 commaSepEndBy1 :: Parser a -> Parser [a]
 commaSepEndBy1 p = lexeme p `sepEndBy1` comma
 
+-- combine two expressions into a tuple
+tuplify :: Expr -> Expr -> Expr
+tuplify e1 e2 = Tuple [e1, e2]
+
+binBuiltin :: Builtin -> Expr -> Expr -> Expr
+binBuiltin b e1 e2 = Builtin b (tuplify e1 e2)
+
 binop :: String -> (a -> a -> a) -> Assoc -> Operator String u Identity a
 binop name fn = Infix ((reservedOp name <|> reserved name) *> pure fn)
 
@@ -65,16 +72,17 @@ prefix name fn = Prefix ((reservedOp name <|> reserved name) *> pure fn)
 
 expression :: Parser Expr
 expression = buildExpressionParser
-    [ [ prefix "~" Not, prefix "@" Ref, prefix "!" Deref ]
-    , [ binopl "*" Mult, binopl "/" Div ]
-    , [ binopl "+" Add, binopl "-" Sub ]
-    , [ binopl ">>" Shr, binopl "<<" Shl ]
-    , [ binopl "&" And ]
-    , [ binopl "^" Xor ]
-    , [ binopl "|" Or ]
-    , [ binopl ">=" Geq, binopl "<=" Leq, binopl ">" Gt, binopl "<" Lt
-      , binopl "==" Eq, binopl "~=" Neq
-      ]
+    -- use tuplify to create versions of these constructors that create builtins
+    [ [ prefix "~" (Builtin Not), prefix "@" Ref, prefix "!" Deref ]
+    , [ binopl "*" (binBuiltin Mult), binopl "/" (binBuiltin Div) ]
+    , [ binopl "+" (binBuiltin Add), binopl "-" (binBuiltin Sub) ]
+    , [ binopl ">>" (binBuiltin Shr), binopl "<<" (binBuiltin Shl) ]
+    , [ binopl "&" (binBuiltin And) ]
+    , [ binopl "^" (binBuiltin Xor) ]
+    , [ binopl "|" (binBuiltin Or) ]
+    , [ binopl ">=" (binBuiltin Geq), binopl "<=" (binBuiltin Leq)
+      , binopl ">" (binBuiltin Gt), binopl "<" (binBuiltin Lt)
+      , binopl "==" (binBuiltin Eq), binopl "~=" (binBuiltin Neq) ]
     , [ binopl "=" Assign ]
     ]
     compoundExpression
