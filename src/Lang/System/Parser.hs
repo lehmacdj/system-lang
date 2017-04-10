@@ -7,6 +7,8 @@ import qualified Text.Parsec.Token as P
 import Text.Parsec.Language (emptyDef)
 import Data.Functor.Identity (Identity)
 import Control.Applicative hiding ((<|>), optional)
+import Data.List (tails)
+import Control.Monad
 
 type Parser = Parsec String ()
 
@@ -70,39 +72,71 @@ binopl name fn = binop name fn AssocLeft
 prefix :: String -> (a -> a) -> Operator String u Identity a
 prefix name fn = Prefix ((reservedOp name <|> reserved name) *> pure fn)
 
+-- a magic thing that works like build expression parser but is better
+-- specifically supports repeated prefix operators
+-- http://stackoverflow.com/questions/33214163/parsec-expr-repeated-prefix-with-different-priority/33534426#33534426
+buildPrattParser table termP = parser precs where
+
+  precs = reverse table
+
+  prefixP = choice prefixPs <|> termP where
+    prefixPs = do
+      precsR@(ops:_) <- tails precs
+      Prefix opP <- ops
+      return $ opP <*> parser precsR
+
+  infixP precs lhs = choice infixPs <|> pure lhs where
+    infixPs = do
+      precsR@(ops:precsL) <- tails precs
+      op <- ops
+      p <- case op of
+        Infix opP assoc -> do
+          let p precs = opP <*> pure lhs <*> parser precs
+          return $ case assoc of
+            AssocNone  -> error "Non associative operators are not supported"
+            AssocLeft  -> p precsL
+            AssocRight -> p precsR
+        Postfix opP ->
+          return $ opP <*> pure lhs
+        Prefix _ -> mzero
+      return $ p >>= infixP precs
+
+  parser precs = prefixP >>= infixP precs
+
 expression :: Parser Expr
-expression = buildExpressionParser
-    [ [ prefix "~" (Builtin Not), prefix "@" Ref, prefix "!" Deref ]
-    , [ binopl "*" (binBuiltin Mult), binopl "/" (binBuiltin Div) ]
-    , [ binopl "+" (binBuiltin Add), binopl "-" (binBuiltin Sub) ]
-    , [ binopl ">>" (binBuiltin Shr), binopl "<<" (binBuiltin Shl) ]
-    , [ binopl "&" (binBuiltin And) ]
-    , [ binopl "^" (binBuiltin Xor) ]
-    , [ binopl "|" (binBuiltin Or) ]
-    , [ binopl ">=" (binBuiltin Geq), binopl "<=" (binBuiltin Leq)
-      , binopl ">" (binBuiltin Gt), binopl "<" (binBuiltin Lt)
-      , binopl "==" (binBuiltin Eq), binopl "~=" (binBuiltin Neq) ]
-    , [ binopl "=" Assign ]
-    ]
-    compoundExpression
+expression =
+    applications
+    <|> buildPrattParser
+        [ [ prefix "~" (Builtin Not), prefix "@" Ref, prefix "!" Deref ]
+        , [ binopl "*" (binBuiltin Mult), binopl "/" (binBuiltin Div) ]
+        , [ binopl "+" (binBuiltin Add), binopl "-" (binBuiltin Sub) ]
+        , [ binopl ">>" (binBuiltin Shr), binopl "<<" (binBuiltin Shl) ]
+        , [ binopl "&" (binBuiltin And) ]
+        , [ binopl "^" (binBuiltin Xor) ]
+        , [ binopl "|" (binBuiltin Or) ]
+        , [ binopl ">=" (binBuiltin Geq), binopl "<=" (binBuiltin Leq)
+          , binopl ">" (binBuiltin Gt), binopl "<" (binBuiltin Lt)
+          , binopl "==" (binBuiltin Eq), binopl "~=" (binBuiltin Neq) ]
+        , [ binopl "=" Assign ]
+        ]
+        compoundExpression
 
 compoundExpression :: Parser Expr
 compoundExpression =
     try tuple
-    <|> parens compoundExpression
+    <|> parens expression
     <|> fmap Literal literal
     <|> fmap Var identifier
     <|> conditional
     <|> while
-    -- <|> applications -- this is pretty sketchy
     <|> block
     <|> array
 
 literal :: Parser Literal
 literal = fromInteger <$> integer
 
--- applications :: Parser Expr
--- applications = foldl App <$> expression <*> some (parens expression)
+applications :: Parser Expr
+applications = foldl1 App <$> compoundExpression `sepBy1` whiteSpace
 
 block :: Parser Expr
 block = Block <$> braces (semiSepEndBy1 expression)
