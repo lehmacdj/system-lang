@@ -72,7 +72,6 @@ prefix name fn = Prefix ((reservedOp name <|> reserved name) *> pure fn)
 
 expression :: Parser Expr
 expression = buildExpressionParser
-    -- use tuplify to create versions of these constructors that create builtins
     [ [ prefix "~" (Builtin Not), prefix "@" Ref, prefix "!" Deref ]
     , [ binopl "*" (binBuiltin Mult), binopl "/" (binBuiltin Div) ]
     , [ binopl "+" (binBuiltin Add), binopl "-" (binBuiltin Sub) ]
