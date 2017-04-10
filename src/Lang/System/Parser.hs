@@ -58,11 +58,11 @@ commaSepEndBy1 :: Parser a -> Parser [a]
 commaSepEndBy1 p = lexeme p `sepEndBy1` comma
 
 -- combine two expressions into a tuple
-tuplify :: Expr -> Expr -> Expr
-tuplify e1 e2 = Tuple [e1, e2]
+tuplify :: Raw -> Raw -> Raw
+tuplify e1 e2 = Tuple () [e1, e2]
 
-binBuiltin :: Builtin -> Expr -> Expr -> Expr
-binBuiltin b e1 e2 = Builtin b (tuplify e1 e2)
+binBuiltin :: Builtin -> Raw -> Raw -> Raw
+binBuiltin b e1 e2 = Builtin () b (tuplify e1 e2)
 
 binop :: String -> (a -> a -> a) -> Assoc -> Operator String u Identity a
 binop name fn = Infix ((reservedOp name <|> reserved name) *> pure fn)
@@ -107,11 +107,11 @@ buildPrattParser table termP = parser precs where
 
   parser precs = prefixP >>= infixP precs
 
-expression :: Parser Expr
+expression :: Parser Raw
 expression =
     applications
     <|> buildPrattParser
-        [ [ prefix "~" (Builtin Not), prefix "@" Ref, prefix "!" Deref ]
+        [ [ prefix "~" (Builtin () Not), prefix "@" (Ref ()), prefix "!" (Deref ()) ]
         , [ binopl "*" (binBuiltin Mult), binopl "/" (binBuiltin Div) ]
         , [ binopl "+" (binBuiltin Add), binopl "-" (binBuiltin Sub) ]
         , [ binopl ">>" (binBuiltin Shr), binopl "<<" (binBuiltin Shl) ]
@@ -121,17 +121,17 @@ expression =
         , [ binopl ">=" (binBuiltin Geq), binopl "<=" (binBuiltin Leq)
           , binopl ">" (binBuiltin Gt), binopl "<" (binBuiltin Lt)
           , binopl "==" (binBuiltin Eq), binopl "~=" (binBuiltin Neq) ]
-        , [ binopl "=" Assign ]
+        , [ binopl "=" (Assign ()) ]
         ]
         compoundExpression
 
-compoundExpression :: Parser Expr
+compoundExpression :: Parser Raw
 compoundExpression =
     try tuple
     <|> parens expression
-    <|> Literal <$> literal
-    <|> Var <$> identifier
-    <|> Sizeof <$> (reserved "sizeof" *> size)
+    <|> Literal () <$> literal
+    <|> Var () <$> identifier
+    <|> Sizeof () <$> (reserved "sizeof" *> size)
     <|> conditional
     <|> while
     <|> block
@@ -140,19 +140,19 @@ compoundExpression =
 literal :: Parser Literal
 literal = fromInteger <$> integer
 
-applications :: Parser Expr
-applications = foldl1 App <$> compoundExpression `sepBy1` whiteSpace
+applications :: Parser Raw
+applications = foldl1 (App ()) <$> compoundExpression `sepBy1` whiteSpace
 
-block :: Parser Expr
-block = Block <$> braces (semiSepEndBy1 expression)
+block :: Parser Raw
+block = Block () <$> braces (semiSepEndBy1 expression)
 
-tuple :: Parser Expr
-tuple = Tuple <$> parens ((:) <$> expression <* comma <*> commaSepEndBy expression)
+tuple :: Parser Raw
+tuple = Tuple () <$> parens ((:) <$> expression <* comma <*> commaSepEndBy expression)
 
-array :: Parser Expr
-array = Array <$> brackets (commaSepEndBy1 expression)
+array :: Parser Raw
+array = Array () <$> brackets (commaSepEndBy1 expression)
 
-conditional :: Parser Expr
+conditional :: Parser Raw
 conditional = do
     reserved "if"
     e1 <- expression
@@ -160,15 +160,15 @@ conditional = do
     e2 <- expression
     reserved "else"
     e3 <- expression
-    pure $ Cond e1 e2 e3
+    pure $ Cond () e1 e2 e3
 
-while :: Parser Expr
+while :: Parser Raw
 while = do
     reserved "while"
     e1 <- expression
     reserved "do"
     e2 <- expression
-    pure $ While e1 e2
+    pure $ While () e1 e2
 
 
 size :: Parser Size
@@ -196,7 +196,7 @@ tupleSize = TupleSize <$> parens (commaSepEndBy1 size)
 arraySize :: Parser Size
 arraySize = brackets (ArraySize <$> size <* semi <*> integer)
 
-readExpr :: String -> Either ParseError Expr
+readExpr :: String -> Either ParseError Raw
 readExpr = parse (whiteSpace *> expression <* eof) "system-expr"
 
 readSize :: String -> Either ParseError Size
