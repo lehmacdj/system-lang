@@ -13,6 +13,7 @@ data Builtin = Add | Sub | Mult | Div
 
 data Expr
     = Builtin Builtin Expr
+    | Sizeof Size
 
     -- control flow
     | App Expr Expr
@@ -35,7 +36,6 @@ data Expr
     -- required but not involved in evaluation
     | Var String
     | Literal Literal
-    -- | SizeCoerce Expr Size
     deriving (Show)
 
 isValue :: Expr -> Bool
@@ -45,3 +45,25 @@ isValue (Block _) = True
 isValue (Tuple es) = all isValue es
 isValue (Array es) = all isValue es
 isValue _ = False
+
+
+data Size = Empty
+          | Bit
+          | Byte
+          | Any
+          | UserSize String
+          | Ptr Size
+          | FunctionSize Size Size
+          | ArraySize Size Integer
+          | TupleSize [Size]
+          deriving (Show)
+
+sizeof :: Size -> Integer
+sizeof Empty = 0
+sizeof Bit = 1
+sizeof Byte = 8
+sizeof Any = undefined
+sizeof (Ptr _) = 64
+sizeof (FunctionSize _ _) = 64
+sizeof (ArraySize s n) = sizeof s * n
+sizeof (TupleSize ss) = sum $ sizeof <$> ss

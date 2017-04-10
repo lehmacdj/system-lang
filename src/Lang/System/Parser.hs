@@ -1,7 +1,7 @@
 module Lang.System.Parser where
 
 import Lang.System.AST
-import Text.Parsec
+import Text.Parsec hiding (Empty)
 import Text.Parsec.Expr
 import qualified Text.Parsec.Token as P
 import Text.Parsec.Language (emptyDef)
@@ -29,7 +29,8 @@ tokenParser = P.makeTokenParser emptyDef
     , P.reservedNames =
         [ "if", "then", "else"
         , "while", "do"
-        , "unit", "bit", "byte" ]
+        , "sizeof"
+        , "Empty", "Bit", "Byte", "Any" ]
     , P.caseSensitive = True
     }
 
@@ -68,6 +69,9 @@ binop name fn = Infix ((reservedOp name <|> reserved name) *> pure fn)
 
 binopl :: String -> (a -> a -> a) -> Operator String u Identity a
 binopl name fn = binop name fn AssocLeft
+
+binopr :: String -> (a -> a -> a) -> Operator String u Identity a
+binopr name fn = binop name fn AssocRight
 
 prefix :: String -> (a -> a) -> Operator String u Identity a
 prefix name fn = Prefix ((reservedOp name <|> reserved name) *> pure fn)
@@ -125,8 +129,9 @@ compoundExpression :: Parser Expr
 compoundExpression =
     try tuple
     <|> parens expression
-    <|> fmap Literal literal
-    <|> fmap Var identifier
+    <|> Literal <$> literal
+    <|> Var <$> identifier
+    <|> Sizeof <$> (reserved "sizeof" *> size)
     <|> conditional
     <|> while
     <|> block
@@ -165,5 +170,33 @@ while = do
     e2 <- expression
     pure $ While e1 e2
 
+
+size :: Parser Size
+size = buildPrattParser
+    [ [ prefix "@" Ptr ]
+    , [ binopr "->" FunctionSize ]
+    ]
+    compoundSize
+
+compoundSize :: Parser Size
+compoundSize =
+    try tupleSize
+    <|> parens size
+    <|> reserved "Empty" *> pure Empty
+    <|> reserved "Bit" *> pure Bit
+    <|> reserved "Byte" *> pure Byte
+    <|> reservedOp "Any" *> pure Any
+    <|> UserSize <$> identifier
+    <|> arraySize
+
+tupleSize :: Parser Size
+tupleSize = TupleSize <$> parens (commaSepEndBy1 size)
+
+arraySize :: Parser Size
+arraySize = brackets (ArraySize <$> size <* semi <*> integer)
+
 readExpr :: String -> Either ParseError Expr
 readExpr = parse (whiteSpace *> expression <* eof) "system-expr"
+
+readSize :: String -> Either ParseError Size
+readSize = parse (whiteSpace *> size <* eof) "system-size"
