@@ -19,6 +19,7 @@ library
                      , Lang.System.AST
   build-depends:       base >= 4.7 && < 5
                      , parsec
+                     , lens
   default-language:    Haskell2010
 
 executable system-exe
