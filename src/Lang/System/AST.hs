@@ -1,70 +1,83 @@
+{-# LANGUAGE DeriveFunctor, DeriveTraversable #-}
+
 module Lang.System.AST where
 
 import Data.Word
 import Text.Printf
 import Data.List
+import Data.Bifunctor
 
 type Literal = Integer
+
+type Ident = String
 
 data Builtin = Add | Sub | Mult | Div
              | And | Or | Xor | Not | Shl | Shr
              | Gt | Geq | Lt | Leq | Eq | Neq
              deriving (Show)
 
-data Expr
-    = Builtin Builtin Expr
-    | Sizeof Size
+type Raw = Expr ()
 
+-- a declaration of a variable
+data Statement a
+    = SizeDec Ident Size
+    | ExprDec Ident (Expr a)
+    | EvalExpr (Expr a)
+    deriving (Functor, Traversable, Show, Foldable)
+
+type Program a = [Statement a]
+
+data Expr a
+    = Literal a Literal
+    | Sizeof a Size
+    | Var a Ident
+    | Builtin a Builtin (Expr a)
     -- control flow
-    | App Expr Expr
-    | Cond Expr Expr Expr
-    | While Expr Expr
-
+    | App a (Expr a) (Expr a)
+    | Cond a (Expr a) (Expr a) (Expr a)
+    | While a (Expr a) (Expr a)
     -- compound expressions
-    | Block [Expr]
-    | Tuple [Expr]
-    | Array [Expr]
-    | Index Expr Expr
-
+    | Block a [Expr a]
+    | Tuple a [Expr a]
+    | Array a [Expr a]
+    | Index a (Expr a) (Expr a)
     -- references
-    | Ref Expr
-    | Deref Expr
-
+    | Ref a (Expr a)
+    | Deref a (Expr a)
     -- assignment
-    | Assign Expr Expr
+    | Assign a (Expr a) (Expr a)
+    deriving (Show, Functor, Foldable, Traversable)
 
-    -- required but not involved in evaluation
-    | Var String
-    | Literal Literal
-    deriving (Show)
-
-isValue :: Expr -> Bool
-isValue (Literal _) = True
-isValue (Var _) = True
-isValue (Block _) = True
-isValue (Tuple es) = all isValue es
-isValue (Array es) = all isValue es
+isValue :: Expr a -> Bool
+isValue (Literal _ _) = True
+isValue (Var _ _) = True
+isValue (Block _ _) = True
+isValue (Tuple _ es) = all isValue es
+isValue (Array _ es) = all isValue es
 isValue _ = False
 
+data ConstSize = Bit
+               | Byte
+               | Empty
+               | Unsized
+               deriving (Show)
 
-data Size = Empty
-          | Bit
-          | Byte
-          | Any
-          | Unsized
-          | UserSize String
+data Size = ConstSize ConstSize
           | Ptr Size
+          | SizeVar Ident
           | FunctionSize Size Size
           | ArraySize Size Integer
           | TupleSize [Size]
           deriving (Show)
 
+instance Eq Size where
+    a == b = sizeof a == sizeof b
+
 sizeof :: Size -> Integer
-sizeof Empty = 0
-sizeof Bit = 1
-sizeof Byte = 8
-sizeof Any = undefined
-sizeof Unsized = undefined
+sizeof (ConstSize Empty) = 0
+sizeof (ConstSize Bit) = 1
+sizeof (ConstSize Byte) = 8
+sizeof (ConstSize Unsized) = undefined
 sizeof (Ptr _) = 64
 sizeof (FunctionSize _ _) = 64
 sizeof (ArraySize s n) = sizeof s * n

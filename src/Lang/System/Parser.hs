@@ -23,14 +23,14 @@ tokenParser = P.makeTokenParser emptyDef
         [ "+", "-", "*", "/"
         , "<", ">", "<=", ">=", "==", "~="
         , "~", "|", "&", "^", ">>", "<<"
-        , "@", "!"
+        , "@", "!", ":="
         , "->"
         , "=", "$" ]
     , P.reservedNames =
         [ "if", "then", "else"
         , "while", "do"
         , "sizeof"
-        , "Empty", "Bit", "Byte", "Any", "Unsized" ]
+        , "Empty", "Bit", "Byte", "Unsized" ]
     , P.caseSensitive = True
     }
 
@@ -182,13 +182,12 @@ compoundSize :: Parser Size
 compoundSize =
     try tupleSize
     <|> parens size
-    <|> reserved "Empty" *> pure Empty
-    <|> reserved "Bit" *> pure Bit
-    <|> reserved "Byte" *> pure Byte
-    <|> reserved "Any" *> pure Any
-    <|> reserved "Unsized" *> pure Unsized
-    <|> UserSize <$> identifier
     <|> arraySize
+    <|> reserved "Empty" *> pure (ConstSize Empty)
+    <|> reserved "Bit" *> pure (ConstSize Bit)
+    <|> reserved "Byte" *> pure (ConstSize Byte)
+    <|> reserved "Unsized" *> pure (ConstSize Unsized)
+    <|> SizeVar <$> identifier
 
 tupleSize :: Parser Size
 tupleSize = TupleSize <$> parens (commaSepEndBy1 size)
