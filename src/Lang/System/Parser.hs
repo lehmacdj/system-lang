@@ -121,7 +121,7 @@ expression =
         , [ binopl ">=" (binBuiltin Geq), binopl "<=" (binBuiltin Leq)
           , binopl ">" (binBuiltin Gt), binopl "<" (binBuiltin Lt)
           , binopl "==" (binBuiltin Eq), binopl "~=" (binBuiltin Neq) ]
-        , [ binopl "=" (Assign ()) ]
+        , [ binopl ":=" (Assign ()) ]
         ]
         compoundExpression
 
@@ -144,7 +144,7 @@ applications :: Parser Raw
 applications = foldl1 (App ()) <$> compoundExpression `sepBy1` whiteSpace
 
 block :: Parser Raw
-block = Block () <$> braces (semiSepEndBy1 expression)
+block = Block () <$> braces program
 
 tuple :: Parser Raw
 tuple = Tuple () <$> parens ((:) <$> expression <* comma <*> commaSepEndBy expression)
@@ -169,6 +169,22 @@ while = do
     reserved "do"
     e2 <- expression
     pure $ While () e1 e2
+
+
+declaration :: Parser RawStmt
+declaration =
+    try sizeDecl
+    <|> try exprDecl
+    <|> EvalExpr <$> expression
+
+sizeDecl :: Parser RawStmt
+sizeDecl = SizeDecl <$> identifier <* reservedOp "$" <*> size
+
+exprDecl :: Parser RawStmt
+exprDecl = ExprDecl <$> identifier <* reservedOp "=" <*> expression
+
+program :: Parser RawProg
+program = semiSepEndBy1 declaration
 
 
 size :: Parser Size
@@ -196,8 +212,12 @@ tupleSize = TupleSize <$> parens (commaSepEndBy1 size)
 arraySize :: Parser Size
 arraySize = brackets (ArraySize <$> size <* semi <*> integer)
 
+
 readExpr :: String -> Either ParseError Raw
 readExpr = parse (whiteSpace *> expression <* eof) "system-expr"
 
 readSize :: String -> Either ParseError Size
 readSize = parse (whiteSpace *> size <* eof) "system-size"
+
+readProgram :: String -> Either ParseError RawProg
+readProgram = parse (whiteSpace *> program <* eof) "system-program"

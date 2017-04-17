@@ -17,15 +17,17 @@ data Builtin = Add | Sub | Mult | Div
              deriving (Show)
 
 type Raw = Expr ()
+type RawStmt = Statement ()
+type RawProg = Program ()
+
+type Program a = [Statement a]
 
 -- a declaration of a variable
 data Statement a
-    = SizeDec Ident Size
-    | ExprDec Ident (Expr a)
+    = SizeDecl Ident Size
+    | ExprDecl Ident (Expr a)
     | EvalExpr (Expr a)
     deriving (Functor, Traversable, Show, Foldable)
-
-type Program a = [Statement a]
 
 data Expr a
     = Literal a Literal
@@ -37,7 +39,7 @@ data Expr a
     | Cond a (Expr a) (Expr a) (Expr a)
     | While a (Expr a) (Expr a)
     -- compound expressions
-    | Block a [Expr a]
+    | Block a (Program a)
     | Tuple a [Expr a]
     | Array a [Expr a]
     | Index a (Expr a) (Expr a)
