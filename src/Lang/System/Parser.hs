@@ -43,6 +43,7 @@ P.TokenParser
     , P.integer = integer
     , P.braces = braces
     , P.brackets = brackets
+    , P.angles = angles
     , P.lexeme = lexeme
     , P.comma = comma
     , P.semi = semi
@@ -76,11 +77,13 @@ binopr name fn = binop name fn AssocRight
 prefix :: String -> (a -> a) -> Operator String u Identity a
 prefix name fn = Prefix ((reservedOp name <|> reserved name) *> pure fn)
 
+application :: Operator String u Identity Raw
+application = Infix (whiteSpace *> pure (App ())) AssocLeft
+
 -- a magic thing that works like build expression parser but is better
 -- specifically supports repeated prefix operators
 -- http://stackoverflow.com/questions/33214163/parsec-expr-repeated-prefix-with-different-priority/33534426#33534426
 buildPrattParser table termP = parser precs where
-
   precs = reverse table
 
   prefixP = choice prefixPs <|> termP where
@@ -109,9 +112,9 @@ buildPrattParser table termP = parser precs where
 
 expression :: Parser Raw
 expression =
-    applications
-    <|> buildPrattParser
-        [ [ prefix "~" (Builtin () Not), prefix "@" (Ref ()), prefix "!" (Deref ()) ]
+    buildPrattParser
+        [ [ application ]
+        , [ prefix "~" (Builtin () Not), prefix "@" (Ref ()), prefix "!" (Deref ()) ]
         , [ binopl "*" (binBuiltin Mult), binopl "/" (binBuiltin Div) ]
         , [ binopl "+" (binBuiltin Add), binopl "-" (binBuiltin Sub) ]
         , [ binopl ">>" (binBuiltin Shr), binopl "<<" (binBuiltin Shl) ]
@@ -139,9 +142,6 @@ compoundExpression =
 
 literal :: Parser Literal
 literal = fromInteger <$> integer
-
-applications :: Parser Raw
-applications = foldl1 (App ()) <$> compoundExpression `sepBy1` whiteSpace
 
 block :: Parser Raw
 block = Block () <$> braces program
