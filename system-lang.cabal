@@ -17,9 +17,14 @@ library
   hs-source-dirs:      src
   exposed-modules:     Lang.System.Parser
                      , Lang.System.AST
+                     , Lang.System.Sizer
+                     , Lang.System.Unifier
+                     , Lang.System.Unique
   build-depends:       base >= 4.7 && < 5
                      , parsec
                      , lens
+                     , mtl
+                     , transformers
   default-language:    Haskell2010
 
 executable system-exe
