@@ -30,7 +30,7 @@ tokenParser = P.makeTokenParser emptyDef
         [ "if", "then", "else"
         , "while", "do"
         , "sizeof"
-        , "Empty", "Bit", "Byte", "Unsized" ]
+        , "Empty", "Bit", "Byte", "Int", "Unsized" ]
     , P.caseSensitive = True
     }
 
@@ -186,6 +186,7 @@ compoundSize =
     <|> reserved "Empty" *> pure (ConstSize Empty)
     <|> reserved "Bit" *> pure (ConstSize Bit)
     <|> reserved "Byte" *> pure (ConstSize Byte)
+    <|> reserved "Int" *> pure (ConstSize Int)
     <|> reserved "Unsized" *> pure (ConstSize Unsized)
     <|> SizeVar <$> identifier
 

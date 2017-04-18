@@ -58,6 +58,7 @@ isValue _ = False
 
 data ConstSize = Bit
                | Byte
+               | Int
                | Empty
                | Unsized
                deriving (Show)
@@ -77,6 +78,7 @@ sizeof :: Size -> Integer
 sizeof (ConstSize Empty) = 0
 sizeof (ConstSize Bit) = 1
 sizeof (ConstSize Byte) = 8
+sizeof (ConstSize Int) = 32
 sizeof (ConstSize Unsized) = undefined
 sizeof (Ptr _) = 64
 sizeof (FunctionSize _ _) = 64
