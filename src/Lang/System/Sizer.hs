@@ -96,6 +96,9 @@ generateConstraints (Assign s e1 e2) =
     ++ generateConstraints e1
     ++ generateConstraints e2
 
-sizeCheck :: SizedExpr -> Maybe SizedExpr
-sizeCheck se = traverse ((unify constraints <*>) . pure) se
+sizeInfer :: SizedExpr -> Maybe SizedExpr
+sizeInfer se = traverse ((unify constraints <*>) . pure) se
     where constraints = generateConstraints se
+
+sizeCheck :: SizedExpr -> Maybe SizedExpr
+sizeCheck se = undefined
