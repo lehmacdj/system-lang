@@ -138,7 +138,6 @@ compoundExpression =
     <|> conditional
     <|> while
     <|> block
-    <|> array
 
 literal :: Parser Literal
 literal = fromInteger <$> integer
@@ -148,9 +147,6 @@ block = Block () <$> braces program
 
 tuple :: Parser Raw
 tuple = Tuple () <$> parens ((:) <$> expression <* comma <*> commaSepEndBy expression)
-
-array :: Parser Raw
-array = Array () <$> brackets (commaSepEndBy1 expression)
 
 conditional :: Parser Raw
 conditional = do
@@ -188,17 +184,12 @@ program = semiSepEndBy1 declaration
 
 
 size :: Parser Size
-size = buildPrattParser
-    [ [ prefix "@" Ptr ]
-    , [ binopr "->" FunctionSize ]
-    ]
-    compoundSize
+size = buildPrattParser [] compoundSize
 
 compoundSize :: Parser Size
 compoundSize =
     try tupleSize
     <|> parens size
-    <|> arraySize
     <|> reserved "Empty" *> pure (ConstSize Empty)
     <|> reserved "Bit" *> pure (ConstSize Bit)
     <|> reserved "Byte" *> pure (ConstSize Byte)
@@ -208,10 +199,6 @@ compoundSize =
 
 tupleSize :: Parser Size
 tupleSize = TupleSize <$> parens (commaSepEndBy1 size)
-
-arraySize :: Parser Size
-arraySize = brackets (ArraySize <$> size <* semi <*> integer)
-
 
 readExpr :: String -> Either ParseError Raw
 readExpr = parse (whiteSpace *> expression <* eof) "system-expr"

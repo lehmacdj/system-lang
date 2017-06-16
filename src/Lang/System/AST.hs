@@ -53,11 +53,6 @@ data Expr a
     -- compound expressions
     | Block a (Program a)
     | Tuple a [Expr a]
-    | Array a [Expr a]
-    | Index a (Expr a) Literal
-    -- references
-    | Ref a (Expr a)
-    | Deref a (Expr a)
     -- assignment
     | Assign a (Expr a) (Expr a)
     deriving (Show, Functor, Foldable, Traversable)
@@ -77,20 +72,11 @@ subexpressions (Cond _ e1 e2 e3) = [e1, e2, e3]
 subexpressions (While _ e1 e2) = [e1, e2]
 subexpressions (Block _ p) = programExpressions p
 subexpressions (Tuple _ es) = es
-subexpressions (Array _ es) = es
-subexpressions (Index _ e n) = [e]
-subexpressions (Ref _ e) = [e]
-subexpressions (Deref _ e) = [e]
 subexpressions (Assign _ e1 e2) = [e1, e2]
 
 _Tuple :: Prism' (Expr a) (a, [Expr a])
 _Tuple = prism (uncurry Tuple) project where
     project (Tuple i es) = Right (i, es)
-    project e = Left e
-
-_Array :: Prism' (Expr a) (a, [Expr a])
-_Array = prism (uncurry Array) project where
-    project (Array i es) = Right (i, es)
     project e = Left e
 
 _info :: Lens' (Expr a) a
@@ -105,10 +91,6 @@ _info = lens get set where
     get (While x _ _) = x
     get (Block x _) = x
     get (Tuple x _) = x
-    get (Array x _) = x
-    get (Index x _ _) = x
-    get (Ref x _) = x
-    get (Deref x _) = x
     get (Assign x _ _) = x
 
     set :: Expr a -> a -> Expr a
@@ -121,10 +103,6 @@ _info = lens get set where
     set (While x e1 e2) x' = While x' e1 e2
     set (Block x p) x' = Block x' p
     set (Tuple x e) x' = Tuple x' e
-    set (Array y e) x' = Array x' e
-    set (Index x e1 e2) x' = Index x' e1 e2
-    set (Ref x e) x' = Ref x' e
-    set (Deref x e) x' = Deref x' e
     set (Assign x e1 e2) x' = Assign x' e1 e2
 
 isValue :: Expr a -> Bool
@@ -132,61 +110,24 @@ isValue (Literal _ _) = True
 isValue (Var _ _) = True
 isValue (Block _ _) = True
 isValue (Tuple _ es) = all isValue es
-isValue (Array _ es) = all isValue es
 isValue _ = False
 
-data ConstSize = Bit
-               | Byte
-               | Int
-               | Empty
-               | Unsized
-               deriving (Show, Eq)
-
-data Size = ConstSize ConstSize
-          | Ptr Size
+data Size = Empty -- 0
+          | Bit -- 1
+          | Unsized
           | SizeVar Ident
-          | FunctionSize Size Size
-          | ArraySize Size Integer
-          | TupleSize [Size]
-          -- may not appear in programs, used internally and for literals
-          | PolySize [Size]
+          | SizeSum Size Size
+          -- is a size morphism from 1 -> 2 with size 3
+          | SizeMorph Size Size Size
           deriving (Show)
 
-numericSize :: Size
-numericSize = PolySize $ ConstSize <$> [Bit, Byte, Int]
-
 instance Eq Size where
-    (ConstSize a) == (ConstSize b) = a == b
-    (Ptr a) == (Ptr b) = a == b
-    (SizeVar a) == (SizeVar b) = a == b
-    (FunctionSize a r) == (FunctionSize a' r') = a == a' && r == r'
-    (ArraySize a n) == (ArraySize a' n') = a == a' && n == n'
-    (TupleSize ss) == (TupleSize ss') = ss == ss'
-    (PolySize ss) == (PolySize ss')
-      | length ss < length ss' = ss' `elem` permutations ss
-      | otherwise = ss `elem` permutations ss'
-    a == (PolySize ss) = a `elem` ss
-    (PolySize ss) == b = b `elem` ss
-    a == b = False
+    s == s' = sizeof s == sizeof s'
 
-instance VarContaining Size Ident where
-    allvs (ConstSize _) = []
-    allvs (Ptr s) = allvs s
-    allvs (FunctionSize s1 s2) = allvs s1 ++ allvs s2
-    allvs (ArraySize s _) = allvs s
-    allvs (TupleSize ss) = ss >>= allvs
-    allvs (PolySize ss) = ss >>= allvs
-
-    fvs = allvs
-
-sizeof :: Size -> Integer
-sizeof (ConstSize Empty) = 0
-sizeof (ConstSize Bit) = 1
-sizeof (ConstSize Byte) = 8
-sizeof (ConstSize Int) = 32
-sizeof (ConstSize Unsized) = undefined
-sizeof (Ptr _) = 64
-sizeof (FunctionSize _ _) = 64
-sizeof (ArraySize s n) = sizeof s * n
-sizeof (TupleSize ss) = sum $ sizeof <$> ss
-sizeof (PolySize ss) = undefined
+sizeof :: Size -> Maybe Integer
+sizeof Empty = Just 0
+sizeof Bit = Just 1
+sizeof (SizeVar _) = Nothing
+sizeof Unsized = Nothing
+sizeof (SizeSum s t) = (+) <$> sizeof s <*> sizeof t
+sizeof (SizeMorph _ _ s) = sizeof s
